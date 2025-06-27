@@ -11,23 +11,15 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import pickle
+import requests
+from dotenv import load_dotenv
 
-# Pydantic models
-class ChatMessage(BaseModel):
-    message: str
-    session_id: str
+app = FastAPI()
 
-class ChatResponse(BaseModel):
-    response: str
-    calendar_events: Optional[List[Dict]] = None
-    booking_confirmed: Optional[bool] = None
-
-# FastAPI app
-app = FastAPI(title="TailorTalk Calendar Agent API")
-
+# CORS setup (restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Change to your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -372,58 +364,81 @@ app_graph = workflow.compile()
 # Session storage (in production, use Redis or database)
 sessions = {}
 
+# Pydantic models
+class ChatMessage(BaseModel):
+    message: str
+    session_id: str
+
+class ChatResponse(BaseModel):
+    response: str
+    booking_confirmed: bool = False
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(chat_message: ChatMessage):
     """Main chat endpoint"""
     session_id = chat_message.session_id
     message = chat_message.message
-    
-    # Initialize session if new
-    if session_id not in sessions:
-        sessions[session_id] = {
-            "messages": [],
-            "user_intent": "",
-            "step": "initial"
-        }
-    
-    try:
-        # Add user message to session
-        sessions[session_id]["messages"].append(HumanMessage(content=message))
-        
-        # Create state for LangGraph
-        initial_state = {
-            "messages": [HumanMessage(content=message)],
-            "user_intent": "",
-            "extracted_datetime": None,
-            "suggested_slots": None,
-            "booking_details": None,
-            "step": sessions[session_id]["step"]
-        }
-        
-        # Run the agent
-        result = app_graph.invoke(initial_state)
-        
-        # Extract response
-        response_message = result["messages"][-1].content
-        
-        # Update session
-        sessions[session_id]["messages"].extend(result["messages"])
-        sessions[session_id]["user_intent"] = result.get("user_intent", "")
-        sessions[session_id]["step"] = result.get("step", "")
-        
+
+    # Use LangGraph agent for scheduling/booking/availability
+    keywords = ["schedule", "book", "appointment", "meeting", "available", "free", "check", "confirm", "yes", "okay"]
+    if any(word in message.lower() for word in keywords):
+        # Use LangGraph agent
+        state = {"messages": [HumanMessage(content=message)]}
+        result = app_graph.invoke(state)
+        ai_message = result["messages"][-1].content if "messages" in result and result["messages"] else "Sorry, I couldn't process your request."
+        booking_confirmed = result.get("user_intent") == "confirmation"
         return ChatResponse(
-            response=response_message,
-            booking_confirmed="✅" in response_message
+            response=ai_message,
+            booking_confirmed=booking_confirmed
         )
-        
-    except Exception as e:
+    else:
+        # Fallback to GROQ LLM for general questions
+        ai_response = call_groq_ai(message)
         return ChatResponse(
-            response=f"I encountered an error: {str(e)}. Please try again or rephrase your request."
+            response=ai_response,
+            booking_confirmed=False
         )
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+load_dotenv()  # Load .env file
+
+def call_groq_ai(prompt: str) -> str:
+    """Call the GROQ LLM API and return the response."""
+    import os
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return "GROQ API key not found. Please set GROQ_API_KEY in your .env file."
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama3-70b-8192",
+        "messages": [
+            {"role": "system", "content": "You are an AI assistant for calendar and general questions."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 512,
+        "temperature": 0.7
+    }
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        print("GROQ API response:", result)  # Debug print
+        # Defensive: check for keys
+        if "choices" in result and result["choices"]:
+            return result["choices"][0]["message"]["content"].strip()
+        else:
+            return "Sorry, I couldn't understand the response from the AI model."
+    except Exception as e:
+        print(f"GROQ API error: {e}")
+        return "Sorry, I couldn't get a response from the AI model. Please try again later."
 
 if __name__ == "__main__":
     import uvicorn

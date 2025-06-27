@@ -135,10 +135,14 @@ if submit_button and user_input:
                 st.balloons()
             
         else:
+            try:
+                error_msg = response.json().get("response", "Sorry, I encountered an error. Please try again.")
+            except Exception:
+                error_msg = "Sorry, I encountered an error. Please try again."
             st.error(f"API Error: {response.status_code}")
             st.session_state.messages.append({
                 "role": "bot", 
-                "content": "Sorry, I encountered an error. Please try again."
+                "content": error_msg
             })
     
     except requests.exceptions.ConnectionError:
