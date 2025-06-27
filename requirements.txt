@@ -12,24 +12,3 @@ pydantic==2.5.0
 httpx==0.25.2
 python-dotenv==1.0.0
 
-
-# ===== DOCKER CONFIGURATION =====
-"""
-# Dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000 8501
-
-# Create a script to run both services
-RUN echo '#!/bin/bash\nuvicorn main:app --host 0.0.0.0 --port 8000 &\nstreamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0' > start.sh
-RUN chmod +x start.sh
-
-CMD ["./start.sh"]
-"""

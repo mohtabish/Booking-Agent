@@ -47,7 +47,7 @@ if "session_id" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "api_url" not in st.session_state:
-    st.session_state.api_url = "http://localhost:8000"  # Change this to your deployed API URL
+    st.session_state.api_url = "http://localhost:8000"  
 
 # Title
 st.markdown("""
@@ -107,7 +107,7 @@ with st.form(key="chat_form", clear_on_submit=True):
 
 # Process user input
 if submit_button and user_input:
-    # Add user message to chat
+    
     st.session_state.messages.append({"role": "user", "content": user_input})
     
     try:
@@ -126,10 +126,10 @@ if submit_button and user_input:
             result = response.json()
             bot_response = result["response"]
             
-            # Add bot response to chat
+            
             st.session_state.messages.append({"role": "bot", "content": bot_response})
             
-            # Show booking confirmation if applicable
+            
             if result.get("booking_confirmed"):
                 st.success("🎉 Appointment booked successfully!")
                 st.balloons()
@@ -158,7 +158,7 @@ if submit_button and user_input:
             "content": f"Sorry, I encountered an unexpected error: {str(e)}"
         })
     
-    # Rerun to show new messages
+    
     st.rerun()
 
 # Footer

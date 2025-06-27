@@ -19,7 +19,7 @@ app = FastAPI()
 # CORS setup (restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to your frontend domain in production
+    allow_origins=["*"],  # Change to specific origins in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,12 +39,12 @@ class GoogleCalendarService:
         """Initialize Google Calendar service"""
         creds = None
         
-        # Load existing token
+        
         if os.path.exists(TOKEN_FILE):
             with open(TOKEN_FILE, 'rb') as token:
                 creds = pickle.load(token)
         
-        # If no valid credentials, get new ones
+        
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
@@ -60,12 +60,12 @@ class GoogleCalendarService:
                     flow.fetch_token(code=code)
                     creds = flow.credentials
                 else:
-                    # For demo purposes, use mock data if no credentials
+                    
                     print("No Google credentials found. Using mock calendar data.")
                     self.service = None
                     return
             
-            # Save credentials
+            
             with open(TOKEN_FILE, 'wb') as token:
                 pickle.dump(creds, token)
         
@@ -74,7 +74,7 @@ class GoogleCalendarService:
     def get_events(self, start_time: datetime, end_time: datetime) -> List[Dict]:
         """Get calendar events in time range"""
         if not self.service:
-            # Return mock data for demo
+            
             return self._get_mock_events(start_time, end_time)
         
         try:
@@ -169,7 +169,7 @@ class GoogleCalendarService:
 # Initialize calendar service
 calendar_service = GoogleCalendarService()
 
-# ===== LANGGRAPH AGENT =====
+#  LANGGRAPH AGENT 
 from langgraph.graph import StateGraph, END
 from langchain.tools import tool
 from langchain.schema import HumanMessage, AIMessage
@@ -188,21 +188,21 @@ class AgentState(TypedDict):
 def check_calendar_availability(date_range: str) -> str:
     """Check calendar availability for a given date range"""
     try:
-        # Parse date range (simplified for demo)
+        
         if "tomorrow" in date_range.lower():
             start_date = datetime.now() + timedelta(days=1)
         elif "today" in date_range.lower():
             start_date = datetime.now()
         elif "friday" in date_range.lower():
-            # Find next Friday
-            days_ahead = 4 - datetime.now().weekday()  # Friday is 4
+            
+            days_ahead = 4 - datetime.now().weekday()  
             if days_ahead <= 0:
                 days_ahead += 7
             start_date = datetime.now() + timedelta(days=days_ahead)
         else:
             start_date = datetime.now() + timedelta(days=1)
         
-        end_date = start_date + timedelta(hours=12)  # Check 12 hours
+        end_date = start_date + timedelta(hours=12)  
         
         events = calendar_service.get_events(start_date, end_date)
         
@@ -224,7 +224,7 @@ def check_calendar_availability(date_range: str) -> str:
 def suggest_time_slots(preferences: str) -> str:
     """Suggest available time slots based on user preferences"""
     try:
-        # Simple logic for demo
+        
         base_date = datetime.now() + timedelta(days=1)
         
         if "afternoon" in preferences.lower():
@@ -259,13 +259,13 @@ def suggest_time_slots(preferences: str) -> str:
 def book_appointment(details: str) -> str:
     """Book an appointment with given details"""
     try:
-        # Parse booking details (simplified)
+        
         import re
         
-        # Extract time info
+        
         tomorrow = datetime.now() + timedelta(days=1)
-        start_time = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)  # Default 2 PM
-        end_time = start_time + timedelta(hours=1)  # 1 hour meeting
+        start_time = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)  
+        end_time = start_time + timedelta(hours=1)  
         
         # Create the event
         event = calendar_service.create_event(
@@ -295,7 +295,7 @@ def call_model(state):
     messages = state['messages']
     last_message = messages[-1].content if messages else ""
     
-    # Simple intent detection
+    
     intent = "unknown"
     if any(word in last_message.lower() for word in ["schedule", "book", "appointment", "meeting"]):
         intent = "booking"
@@ -304,11 +304,11 @@ def call_model(state):
     elif any(word in last_message.lower() for word in ["confirm", "yes", "okay"]):
         intent = "confirmation"
     
-    # Generate appropriate response
+    
     if intent == "booking":
         if "tomorrow afternoon" in last_message.lower():
             response = "I'd be happy to help you schedule a call for tomorrow afternoon! Let me check what times are available."
-            # This would trigger calendar check
+            
         elif "friday" in last_message.lower():
             response = "Let me check your availability for this Friday."
         else:
@@ -342,7 +342,7 @@ def call_tool(state):
 
     return {**state, "messages": [AIMessage(content=str(result))]}
 
-# Build the graph
+
 workflow = StateGraph(AgentState)
 workflow.add_node("agent", call_model)
 workflow.add_node("action", call_tool)
@@ -358,10 +358,10 @@ workflow.add_conditional_edges(
 )
 workflow.add_edge('action', 'agent')
 
-# Compile the graph
+
 app_graph = workflow.compile()
 
-# Session storage (in production, use Redis or database)
+
 sessions = {}
 
 # Pydantic models
@@ -382,7 +382,7 @@ async def chat_endpoint(chat_message: ChatMessage):
     # Use LangGraph agent for scheduling/booking/availability
     keywords = ["schedule", "book", "appointment", "meeting", "available", "free", "check", "confirm", "yes", "okay"]
     if any(word in message.lower() for word in keywords):
-        # Use LangGraph agent
+        
         state = {"messages": [HumanMessage(content=message)]}
         result = app_graph.invoke(state)
         ai_message = result["messages"][-1].content if "messages" in result and result["messages"] else "Sorry, I couldn't process your request."
@@ -403,7 +403,7 @@ async def chat_endpoint(chat_message: ChatMessage):
 async def health_check():
     return {"status": "healthy"}
 
-load_dotenv()  # Load .env file
+load_dotenv()  
 
 def call_groq_ai(prompt: str) -> str:
     """Call the GROQ LLM API and return the response."""
@@ -430,8 +430,8 @@ def call_groq_ai(prompt: str) -> str:
         response = requests.post(url, headers=headers, json=data, timeout=30)
         response.raise_for_status()
         result = response.json()
-        print("GROQ API response:", result)  # Debug print
-        # Defensive: check for keys
+        print("GROQ API response:", result)  
+        
         if "choices" in result and result["choices"]:
             return result["choices"][0]["message"]["content"].strip()
         else:
