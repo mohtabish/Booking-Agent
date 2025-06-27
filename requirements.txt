@@ -1,0 +1,35 @@
+"""
+fastapi==0.104.1
+uvicorn==0.24.0
+streamlit==1.28.1
+langgraph==0.0.62
+langchain==0.0.350
+google-api-python-client==2.108.0
+google-auth-httplib2==0.1.1
+google-auth-oauthlib==2.0.10
+python-dateutil==2.8.2
+pydantic==2.5.0
+httpx==0.25.2
+python-dotenv==1.0.0
+"""
+
+# ===== DOCKER CONFIGURATION =====
+"""
+# Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000 8501
+
+# Create a script to run both services
+RUN echo '#!/bin/bash\nuvicorn main:app --host 0.0.0.0 --port 8000 &\nstreamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0' > start.sh
+RUN chmod +x start.sh
+
+CMD ["./start.sh"]
+"""
